@@ -91,6 +91,9 @@
     .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; background-color: #f0f2f5; }
     .empty-icon { width: 80px; height: 80px; background-color: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
 
+    /* Active Chat Container */
+    #active-chat:not(.hidden) { display: flex !important; }
+
     /* Messages Stream */
     .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
     .message-bubble { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; position: relative; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -149,7 +152,7 @@
         
         <!-- Google Sign-In Integration -->
         <div id="g_id_onload"
-             data-client_id="189734355989-4sv060elrcabo89tb45es9hhmv0odo1b.apps.googleusercontent.com"
+             data-client_id="YOUR_ACTUAL_CLIENT_ID.apps.googleusercontent.com"
              data-callback="handleGoogleLogin"
              data-auto_prompt="false">
         </div>
@@ -260,7 +263,7 @@
       </div>
 
       <!-- Active Chat Interface -->
-      <div id="active-chat" class="hidden" style="display:flex; flex-direction:column; height:100%;">
+      <div id="active-chat" class="hidden" style="flex-direction:column; height:100%;">
         <div class="header">
           <div style="display:flex; align-items:center; gap:10px;">
             <button class="icon-btn back-btn hidden" onclick="closeMobileChat()" title="Back">
