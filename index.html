@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>बातचीत (BaatCheet) — Private • Simple • Secure</title>
   
-  <!-- GOOGLE SIGN-IN LIBRARY -->
+  <!-- GOOGLE SIGN-IN & FIREBASE SDKs -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <style>
     /* ====================================================================
@@ -362,10 +364,23 @@
 
   <!-- ==================== 5. APPLICATION LOGIC ENGINE ==================== -->
   <script>
+    /* FIREBASE INITIALIZATION */
+    const firebaseConfig = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     let currentUser = null;
     let chatList = [];
-    let messagesStore = {}; 
     let activeChat = null;
+    let currentListenerRef = null;
 
     /* Splash Screen & Storage Initialization */
     window.addEventListener('load', () => {
@@ -389,7 +404,6 @@
       if (currentUser) {
         localStorage.setItem('baatcheet_user', JSON.stringify(currentUser));
         localStorage.setItem(`baatcheet_chats_${currentUser.code}`, JSON.stringify(chatList));
-        localStorage.setItem(`baatcheet_msgs_${currentUser.code}`, JSON.stringify(messagesStore));
       }
     }
 
@@ -398,7 +412,6 @@
       if (savedUser) {
         currentUser = JSON.parse(savedUser);
         chatList = JSON.parse(localStorage.getItem(`baatcheet_chats_${currentUser.code}`)) || [];
-        messagesStore = JSON.parse(localStorage.getItem(`baatcheet_msgs_${currentUser.code}`)) || {};
       }
     }
 
@@ -495,6 +508,10 @@
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
+    function getRoomId(codeA, codeB) {
+      return [codeA, codeB].sort().join('_');
+    }
+
     function saveContact() {
       const friendCode = document.getElementById('add-friend-code').value.trim().toUpperCase();
       const friendName = document.getElementById('add-name-input').value.trim();
@@ -509,7 +526,8 @@
         return;
       }
 
-      chatList.push({ id: friendCode, type: 'contact', name: friendName, code: friendCode });
+      const roomId = getRoomId(currentUser.code, friendCode);
+      chatList.push({ id: roomId, type: 'contact', name: friendName, code: friendCode });
       saveToLocalStorage();
       closeModal('modal-add-contact');
       document.getElementById('add-friend-code').value = '';
@@ -586,28 +604,38 @@
       document.getElementById('active-avatar').style.backgroundColor = chat.type === 'group' ? '#2563eb' : '#4b5563';
       document.getElementById('active-status').innerText = chat.type === 'group' ? chat.code : 'Online';
       
-      renderMessages();
+      subscribeToMessages();
       document.getElementById('app-container').classList.add('chat-open');
     }
 
-    function renderMessages() {
+    function subscribeToMessages() {
       const container = document.getElementById('messages-container');
       container.innerHTML = '';
 
+      if (currentListenerRef) {
+        currentListenerRef.off();
+      }
+
       if (!activeChat) return;
 
-      const msgs = messagesStore[activeChat.id] || [];
-      msgs.forEach(m => {
-        const msgBubble = document.createElement('div');
-        msgBubble.className = `message-bubble ${m.out ? 'msg-out' : 'msg-in'}`;
-
-        let senderHtml = m.sender ? `<div class="msg-sender">${escapeHtml(m.sender)}</div>` : '';
-        let ticks = m.out ? ' ✓✓' : '';
-
-        msgBubble.innerHTML = `${senderHtml}<div>${escapeHtml(m.text)}</div><div class="msg-time">${m.time}${ticks}</div>`;
-        container.appendChild(msgBubble);
+      currentListenerRef = db.ref('chats/' + activeChat.id + '/messages');
+      currentListenerRef.on('child_added', (snapshot) => {
+        const m = snapshot.val();
+        const isMe = m.senderCode === currentUser.code;
+        appendMessageUI(m.text, m.time, isMe, m.senderName);
       });
+    }
 
+    function appendMessageUI(text, time, isMe, senderName) {
+      const container = document.getElementById('messages-container');
+      const msgBubble = document.createElement('div');
+      msgBubble.className = `message-bubble ${isMe ? 'msg-out' : 'msg-in'}`;
+
+      let senderHtml = (!isMe && senderName) ? `<div class="msg-sender">${escapeHtml(senderName)}</div>` : '';
+      let ticks = isMe ? ' ✓✓' : '';
+
+      msgBubble.innerHTML = `${senderHtml}<div>${escapeHtml(text)}</div><div class="msg-time">${time}${ticks}</div>`;
+      container.appendChild(msgBubble);
       container.scrollTop = container.scrollHeight;
     }
 
@@ -623,35 +651,15 @@
 
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      if (!messagesStore[activeChat.id]) messagesStore[activeChat.id] = [];
-
-      messagesStore[activeChat.id].push({
+      db.ref('chats/' + activeChat.id + '/messages').push({
+        senderCode: currentUser.code,
+        senderName: currentUser.name,
         text: text,
         time: timeStr,
-        out: true
+        timestamp: Date.now()
       });
 
       input.value = '';
-      saveToLocalStorage();
-      renderMessages();
-
-      setTimeout(() => {
-        const replyText = activeChat.type === 'group' 
-          ? `Received: "${text}"` 
-          : `Hello! Message received: "${text}"`;
-
-        messagesStore[activeChat.id].push({
-          text: replyText,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          out: false,
-          sender: activeChat.type === 'group' ? 'Group Member' : null
-        });
-
-        saveToLocalStorage();
-        if (activeChat && activeChat.id === activeChat.id) {
-          renderMessages();
-        }
-      }, 1000);
     }
 
     function filterContacts() {
