@@ -3,368 +3,132 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>बातचीत (BaatCheet) — Private • Simple • Secure</title>
+  <title>बातचीत (BaatCheet)</title>
   
-  <!-- GOOGLE SIGN-IN & FIREBASE SDKs -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <style>
-    /* ====================================================================
-       1. LIGHT THEME & GLOBAL BASE STYLES
-       ==================================================================== */
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: #f0f2f5; color: #111827; height: 100vh; width: 100vw; overflow: hidden; display: flex; flex-direction: column; user-select: none; }
-    button, input { outline: none; font-family: inherit; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { height: 100%; width: 100vw; overflow: hidden; background-color: #f0f2f5; }
     .hidden { display: none !important; }
 
-    /* Custom Scrollbars */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+    /* Main App Layout */
+    #app-container { display: flex; height: 100vh; width: 100vw; position: relative; }
+    
+    #sidebar { width: 320px; background: #fff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; height: 100%; flex-shrink: 0; }
+    #chat-pane { flex: 1; display: flex; flex-direction: column; height: 100%; background: #efeae2; position: relative; }
 
-    /* Chat Background Pattern (Light) */
-    .chat-pattern {
-      background-color: #efeae2;
-      background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 0);
-      background-size: 20px 20px;
+    .header { height: 60px; background: #f0f2f5; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+    
+    .btn-icon { background: none; border: none; font-size: 18px; cursor: pointer; padding: 6px; }
+
+    .contact-item { padding: 12px; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+    .contact-item.active { background: #e8f5e9; }
+
+    /* Messages & Input Bar */
+    .chat-messages { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .message-bubble { max-width: 80%; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.4; word-break: break-word; }
+    .msg-out { background: #dcf8c6; align-self: flex-end; }
+    .msg-in { background: #ffffff; align-self: flex-start; }
+
+    /* PERMANENT TYPING BOX FIX */
+    .chat-input-bar { 
+      height: 60px; 
+      background: #f0f2f5; 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      padding: 8px 12px; 
+      border-top: 1px solid #e5e7eb;
+      flex-shrink: 0;
     }
-
-    /* ====================================================================
-       2. SPLASH SCREEN (OFFLINE SAFE)
-       ==================================================================== */
-    #splash-screen {
-      position: fixed; inset: 0; z-index: 9999; background-color: #ffffff;
-      display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-      padding: 2rem; transition: opacity 0.4s ease;
-    }
-    .splash-logo {
-      width: 90px; height: 90px; background-color: #16a34a; border-radius: 24px;
-      display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;
-      box-shadow: 0 15px 30px rgba(22, 163, 74, 0.25);
-    }
-    .splash-title { font-size: 2.25rem; font-weight: 800; color: #111827; text-align: center; margin-bottom: 0.25rem; letter-spacing: 0.5px; }
-    .splash-sub { font-size: 0.75rem; font-weight: 700; color: #16a34a; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
-    .spinner { width: 26px; height: 26px; border: 3px solid #16a34a; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ====================================================================
-       3. AUTH CONTAINER & MODALS
-       ==================================================================== */
-    #auth-container { position: fixed; inset: 0; z-index: 5000; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; padding: 16px; }
-    .auth-card { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05); }
     
-    .form-group { text-align: left; margin-bottom: 16px; }
-    .form-label { display: block; font-size: 11px; font-weight: 700; color: #4b5563; margin-bottom: 6px; text-transform: uppercase; }
-    .input-field { width: 100%; padding: 12px 14px; background-color: #f9fafb; border: 1px solid #d1d5db; border-radius: 10px; color: #111827; font-size: 14px; transition: border-color 0.2s; }
-    .input-field:focus { border-color: #16a34a; background-color: #ffffff; }
-    
-    .btn { width: 100%; padding: 12px; background-color: #16a34a; border: none; border-radius: 10px; color: white; font-weight: 600; font-size: 14px; cursor: pointer; transition: background-color 0.2s; }
-    .btn:hover { background-color: #15803d; }
-    .btn-secondary { background-color: #e5e7eb; color: #374151; border: 1px solid #d1d5db; }
-    .btn-secondary:hover { background-color: #d1d5db; }
+    .input-field { flex: 1; height: 40px; padding: 0 12px; border: 1px solid #ccc; border-radius: 20px; font-size: 14px; outline: none; background: #fff; }
+    .send-btn { height: 40px; padding: 0 16px; background: #16a34a; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
 
-    /* ====================================================================
-       4. MAIN DASHBOARD LAYOUT & RESPONSIVE DESIGN
-       ==================================================================== */
-    #app-container { display: flex; height: 100vh; width: 100vw; position: relative; overflow: hidden; }
-    
-    /* Sidebar */
-    #sidebar { width: 360px; background-color: #ffffff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; height: 100%; flex-shrink: 0; transition: transform 0.3s ease; }
-    .header { height: 64px; background-color: #f0f2f5; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
-    
-    .avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #16a34a; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 16px; flex-shrink: 0; }
-    .icon-btn { background: none; border: none; color: #4b5563; cursor: pointer; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-    .icon-btn:hover { background-color: rgba(0,0,0,0.05); color: #111827; }
-
-    .search-box { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; background-color: #ffffff; }
-    
-    /* Contacts List */
-    .contact-item { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: background-color 0.15s; }
-    .contact-item:hover { background-color: #f9fafb; }
-    .contact-item.active { background-color: #f0fdf4; }
-
-    /* Chat Area */
-    #chat-pane { flex: 1; display: flex; flex-direction: column; height: 100%; transition: transform 0.3s ease; }
-    
-    /* Empty State */
-    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; background-color: #f0f2f5; }
-    .empty-icon { width: 80px; height: 80px; background-color: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-
-    /* Active Chat Container */
-    #active-chat:not(.hidden) { display: flex !important; }
-
-    /* Messages Stream */
-    .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .message-bubble { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; position: relative; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-    .msg-out { background-color: #dcf8c6; align-self: flex-end; color: #111827; border-top-right-radius: 2px; }
-    .msg-in { background-color: #ffffff; align-self: flex-start; color: #111827; border-top-left-radius: 2px; }
-    .msg-sender { font-size: 10px; font-weight: bold; color: #16a34a; margin-bottom: 2px; }
-    .msg-time { font-size: 9px; color: #6b7280; text-align: right; margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
-
-    .chat-input-bar { padding: 10px 12px; background-color: #f0f2f5; display: flex; align-items: center; gap: 8px; border-top: 1px solid #e5e7eb; }
-
-    /* Modals Overlay */
-    .modal-overlay { position: fixed; inset: 0; z-index: 6000; background-color: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; padding: 16px; }
-    .modal-card { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-
-    /* ====================================================================
-       5. MOBILE SPECIFIC MEDIA QUERIES
-       ==================================================================== */
+    /* Mobile Screen Responsiveness */
     @media (max-width: 768px) {
       #sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; }
-      #chat-pane { width: 100%; position: absolute; inset: 0; z-index: 20; transform: translateX(100%); }
+      #chat-pane { width: 100%; position: absolute; inset: 0; z-index: 20; transform: translateX(100%); transition: transform 0.2s ease; }
       #app-container.chat-open #chat-pane { transform: translateX(0); }
-      .message-bubble { max-width: 88%; }
-      .back-btn { display: flex !important; }
     }
+
+    /* Modal Overlay */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 99; }
+    .modal-card { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 350px; }
   </style>
 </head>
 <body>
 
-  <!-- ==================== 1. SPLASH SCREEN ==================== -->
-  <div id="splash-screen">
-    <div></div>
-    <div style="display:flex; flex-direction:column; align-items:center;">
-      <div class="splash-logo">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-      </div>
-      <h1 class="splash-title">बातचीत</h1>
-      <p class="splash-sub">PRIVATE • SIMPLE • SECURE</p>
-    </div>
-    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
-      <div class="spinner"></div>
-      <p style="font-size:12px; color:#6b7280; font-weight:500;">End-to-End Encrypted Architecture</p>
+  <!-- LOGIN / REGISTER -->
+  <div id="auth-container" class="modal">
+    <div class="modal-card" style="text-align:center;">
+      <h2 style="margin-bottom: 12px;">बातचीत Login</h2>
+      <input type="text" id="user-name-input" class="input-field" placeholder="Enter Your Name" style="width:100%; margin-bottom:10px;">
+      <button onclick="loginUser()" class="send-btn" style="width:100%;">Start Chatting</button>
     </div>
   </div>
 
-  <!-- ==================== 2. AUTHENTICATION MODAL ==================== -->
-  <div id="auth-container" class="hidden">
-    <div class="auth-card">
-      <div style="display:inline-flex; padding:12px; background-color:rgba(22,163,74,0.1); border-radius:16px; margin-bottom:12px;">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-      </div>
-      <h2 style="font-size:22px; font-weight:bold; margin-bottom:4px; color:#111827;">बातचीत</h2>
-      <p style="font-size:12px; color:#6b7280; margin-bottom:20px;">Secure Private Messaging Platform</p>
-
-      <!-- Login Form -->
-      <form id="login-form" onsubmit="handleLogin(event)">
-        
-        <!-- Google Sign-In Integration -->
-        <div id="g_id_onload"
-             data-client_id="YOUR_ACTUAL_CLIENT_ID.apps.googleusercontent.com"
-             data-callback="handleGoogleLogin"
-             data-auto_prompt="false">
-        </div>
-
-        <div class="g_id_signin" 
-             data-type="standard" 
-             data-size="large" 
-             data-theme="outline" 
-             data-text="sign_in_with" 
-             data-shape="rectangular" 
-             data-logo_alignment="left"
-             style="margin-bottom: 16px; display: flex; justify-content: center;">
-        </div>
-
-        <div style="text-align: center; color: #9ca3af; font-size: 12px; margin-bottom: 16px;">— OR —</div>
-
-        <div class="form-group">
-          <label class="form-label">Username or User Code</label>
-          <input type="text" id="login-id" class="input-field" placeholder="BCXXXXXX or Name">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" id="login-pass" class="input-field" placeholder="••••••••">
-        </div>
-        <button type="submit" class="btn">Login</button>
-        <p style="font-size:12px; color:#6b7280; margin-top:16px;">
-          New account? <a href="#" onclick="toggleAuth('register')" style="color:#16a34a; font-weight:bold; text-decoration:none;">Sign Up</a>
-        </p>
-      </form>
-
-      <!-- Register Form -->
-      <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
-        <div class="form-group">
-          <label class="form-label">Full Name</label>
-          <input type="text" id="reg-name" class="input-field" placeholder="John Doe" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" class="input-field" placeholder="At least 6 characters" required>
-        </div>
-        <button type="submit" class="btn">Create Account</button>
-        <p style="font-size:12px; color:#6b7280; margin-top:16px;">
-          Already have an account? <a href="#" onclick="toggleAuth('login')" style="color:#16a34a; font-weight:bold; text-decoration:none;">Login</a>
-        </p>
-      </form>
-
-      <!-- Code Card -->
-      <div id="code-card" class="hidden" style="margin-top:16px;">
-        <div style="background-color:#f0fdf4; padding:16px; border-radius:12px; border:1px solid #16a34a; margin-bottom:16px;">
-          <p style="font-size:11px; color:#4b5563; margin-bottom:4px;">Your Secure BaatCheet Code:</p>
-          <p id="generated-code" style="font-size:24px; font-family:monospace; font-weight:bold; color:#16a34a;">BC7X92K4</p>
-        </div>
-        <button onclick="enterDashboard()" class="btn">Start Messaging</button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ==================== 3. MAIN APP DASHBOARD ==================== -->
+  <!-- APP CONTAINER -->
   <div id="app-container" class="hidden">
     
-    <!-- LEFT SIDEBAR -->
+    <!-- SIDEBAR -->
     <div id="sidebar">
       <div class="header">
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
           <div id="my-avatar" class="avatar">?</div>
           <div>
-            <div id="my-name" style="font-weight:600; font-size:14px; color:#111827;">User</div>
-            <div id="my-code" style="font-size:10px; color:#16a34a; font-family:monospace; font-weight:bold;">BC000000</div>
+            <div id="my-name" style="font-weight:bold; font-size:14px;">Name</div>
+            <div id="my-code" style="font-size:11px; color:#16a34a; font-weight:bold;">BC0000</div>
           </div>
         </div>
-        <div style="display:flex; gap:2px;">
-          <button class="icon-btn" onclick="openModal('modal-add-contact')" title="Add Contact">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
-          </button>
-          <button class="icon-btn" onclick="openModal('modal-add-group')" title="Create Group">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path><path d="M21 21v-2a4 4 0 0 0-3-3.87"></path><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path><path d="M1 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"></path></svg>
-          </button>
-          <button class="icon-btn" onclick="openModal('modal-settings')" title="Settings">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          </button>
-          <button class="icon-btn" onclick="logout()" style="color:#ef4444;" title="Logout">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-          </button>
-        </div>
+        <button onclick="openAddModal()" class="btn-icon" title="Add Contact">➕</button>
       </div>
-
-      <div class="search-box">
-        <input type="text" id="chat-search" onkeyup="filterContacts()" class="input-field" style="padding: 8px 12px; font-size: 12px;" placeholder="Search chats...">
-      </div>
-
-      <!-- Dynamic Contacts & Groups List -->
-      <div id="contacts-list" style="flex:1; overflow-y:auto;">
-        <!-- Starts completely empty -->
-      </div>
+      <div id="contacts-list" style="flex:1; overflow-y:auto;"></div>
     </div>
 
-    <!-- RIGHT CHAT PANE -->
-    <div id="chat-pane" class="chat-pattern">
-      
-      <!-- Default Empty Screen -->
-      <div id="empty-state" class="empty-state">
-        <div class="empty-icon">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+    <!-- MAIN CHAT PANE (TYPING BOX ALWAYS VISIBLE) -->
+    <div id="chat-pane">
+      <div class="header">
+        <button onclick="closeMobileChat()" class="btn-icon" style="margin-right:8px;">⬅️</button>
+        <div style="flex:1;">
+          <div id="chat-title" style="font-weight:bold; font-size:14px;">Select or Add a Contact</div>
         </div>
-        <h3 style="font-size:20px; font-weight:bold; color:#111827; margin-bottom:6px;">बातचीत (BaatCheet)</h3>
-        <p style="font-size:12px; color:#6b7280; max-width:320px; line-height:1.5;">Private & Secure Messaging System. Select a chat or add a new contact/group to begin.</p>
       </div>
 
-      <!-- Active Chat Interface -->
-      <div id="active-chat" class="hidden" style="flex-direction:column; height:100%;">
-        <div class="header">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <button class="icon-btn back-btn hidden" onclick="closeMobileChat()" title="Back">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            </button>
-            <div id="active-avatar" class="avatar" style="background-color:#4b5563;">?</div>
-            <div>
-              <div id="active-name" style="font-weight:600; font-size:14px; color:#111827;">Contact</div>
-              <div id="active-status" style="font-size:10px; color:#16a34a;">Online</div>
-            </div>
-          </div>
+      <div id="messages-container" class="chat-messages">
+        <div style="text-align:center; color:#777; font-size:12px; margin-top:20px;">
+          Tap '+' on top left to add a contact code, or choose a contact to send messages.
         </div>
-
-        <div id="messages-container" class="chat-messages">
-          <!-- Messages populate here -->
-        </div>
-
-        <form class="chat-input-bar" onsubmit="sendMessage(event)">
-          <input type="text" id="msg-input" class="input-field" style="margin:0; background-color:#ffffff;" placeholder="Type a message..." autocomplete="off" required>
-          <button type="submit" class="btn" style="width:auto; padding:10px 16px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-          </button>
-        </form>
       </div>
 
+      <!-- ALWAYS VISIBLE TYPING INPUT BAR -->
+      <form class="chat-input-bar" onsubmit="sendMessage(event)">
+        <input type="text" id="msg-input" class="input-field" placeholder="Type a message..." required autocomplete="off">
+        <button type="submit" class="send-btn">Send</button>
+      </form>
     </div>
+
   </div>
 
-  <!-- ==================== 4. MODALS ==================== -->
-  
-  <!-- Add Contact Modal -->
-  <div id="modal-add-contact" class="modal-overlay hidden">
+  <!-- ADD CONTACT MODAL -->
+  <div id="add-modal" class="modal hidden">
     <div class="modal-card">
-      <h3 style="font-size:16px; font-weight:bold; color:#111827; margin-bottom:4px;">Add New Contact</h3>
-      <p style="font-size:12px; color:#6b7280; margin-bottom:16px;">Both codes are required to establish a secure 2-way pair:</p>
-      
-      <div class="form-group">
-        <label class="form-label">1. Your Code</label>
-        <input type="text" id="add-my-code" class="input-field" readonly style="background-color:#f3f4f6; font-family:monospace; font-weight:bold; color:#16a34a;">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">2. Friend's Code</label>
-        <input type="text" id="add-friend-code" class="input-field" placeholder="BCXXXXXX" style="text-transform:uppercase; font-family:monospace; font-weight:bold;" required>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Friend's Name</label>
-        <input type="text" id="add-name-input" class="input-field" placeholder="e.g., Alex Smith" required>
-      </div>
-
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
-        <button onclick="closeModal('modal-add-contact')" class="btn btn-secondary" style="width:auto; padding:8px 16px;">Cancel</button>
-        <button onclick="saveContact()" class="btn" style="width:auto; padding:8px 16px;">Verify & Add</button>
+      <h3 style="margin-bottom:10px;">Add Contact</h3>
+      <input type="text" id="friend-code" class="input-field" placeholder="Friend Code (e.g. BC1234)" style="width:100%; margin-bottom:8px; text-transform:uppercase;">
+      <input type="text" id="friend-name" class="input-field" placeholder="Friend Name" style="width:100%; margin-bottom:12px;">
+      <div style="display:flex; gap:8px;">
+        <button onclick="closeAddModal()" class="send-btn" style="background:#888; flex:1;">Cancel</button>
+        <button onclick="confirmAddContact()" class="send-btn" style="flex:1;">Add</button>
       </div>
     </div>
   </div>
 
-  <!-- Create Group Modal -->
-  <div id="modal-add-group" class="modal-overlay hidden">
-    <div class="modal-card">
-      <h3 style="font-size:16px; font-weight:bold; color:#111827; margin-bottom:4px;">Create New Group</h3>
-      <p style="font-size:12px; color:#6b7280; margin-bottom:16px;">Enter group details to start a multi-user chat:</p>
-      
-      <div class="form-group">
-        <label class="form-label">Group Name</label>
-        <input type="text" id="group-name-input" class="input-field" placeholder="e.g., Project Team" required>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Add Member Codes (Comma Separated)</label>
-        <input type="text" id="group-codes-input" class="input-field" placeholder="BC123456, BC789012" style="text-transform:uppercase; font-family:monospace;">
-      </div>
-
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
-        <button onclick="closeModal('modal-add-group')" class="btn btn-secondary" style="width:auto; padding:8px 16px;">Cancel</button>
-        <button onclick="saveGroup()" class="btn" style="width:auto; padding:8px 16px;">Create Group</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="modal-settings" class="modal-overlay hidden">
-    <div class="modal-card" style="text-align:center;">
-      <h3 style="font-size:16px; font-weight:bold; color:#111827; margin-bottom:12px;">Settings & Information</h3>
-      <div style="background-color:#f9fafb; padding:16px; border-radius:12px; border:1px solid #e5e7eb; font-size:12px; color:#374151; line-height:1.6; margin-bottom:16px;">
-        <p style="font-weight:bold; color:#111827; margin-bottom:4px;">बातचीत v1.0</p>
-        <p style="color:#16a34a; font-size:11px; font-weight:bold; margin-bottom:8px;">Private • Simple • Secure</p>
-        <hr style="border-color:#e5e7eb; margin:8px 0;">
-        <p>Developed by <strong>Charith Software Solutions</strong></p>
-        <p style="color:#6b7280; font-size:11px;">kommerasripad@gmail.com</p>
-      </div>
-      <button onclick="closeModal('modal-settings')" class="btn btn-secondary">Close</button>
-    </div>
-  </div>
-
-  <!-- ==================== 5. APPLICATION LOGIC ENGINE ==================== -->
   <script>
-    /* FIREBASE INITIALIZATION */
+    /* FIREBASE CONFIGURATION - REPLACE WITH YOUR KEYS */
     const firebaseConfig = {
       apiKey: "YOUR_FIREBASE_API_KEY",
       authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
@@ -378,299 +142,108 @@
     const db = firebase.database();
 
     let currentUser = null;
-    let chatList = [];
+    let contacts = [];
     let activeChat = null;
-    let currentListenerRef = null;
 
-    /* Splash Screen & Storage Initialization */
-    window.addEventListener('load', () => {
-      loadFromLocalStorage();
-
-      setTimeout(() => {
-        if (currentUser) {
-          enterDashboard();
-        } else {
-          const splash = document.getElementById('splash-screen');
-          splash.style.opacity = '0';
-          setTimeout(() => {
-            splash.classList.add('hidden');
-            document.getElementById('auth-container').classList.remove('hidden');
-          }, 400);
-        }
-      }, 1000);
-    });
-
-    function saveToLocalStorage() {
-      if (currentUser) {
-        localStorage.setItem('baatcheet_user', JSON.stringify(currentUser));
-        localStorage.setItem(`baatcheet_chats_${currentUser.code}`, JSON.stringify(chatList));
+    window.onload = () => {
+      const saved = localStorage.getItem('bc_user');
+      if (saved) {
+        currentUser = JSON.parse(saved);
+        contacts = JSON.parse(localStorage.getItem(`bc_contacts_${currentUser.code}`)) || [];
+        showApp();
       }
+    };
+
+    function loginUser() {
+      const name = document.getElementById('user-name-input').value.trim();
+      if (!name) return alert('Enter your name');
+      
+      const code = 'BC' + Math.floor(1000 + Math.random() * 9000);
+      currentUser = { name, code };
+      localStorage.setItem('bc_user', JSON.stringify(currentUser));
+      showApp();
     }
 
-    function loadFromLocalStorage() {
-      const savedUser = localStorage.getItem('baatcheet_user');
-      if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        chatList = JSON.parse(localStorage.getItem(`baatcheet_chats_${currentUser.code}`)) || [];
-      }
-    }
-
-    function generateCode() {
-      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-      let code = 'BC';
-      for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-      return code;
-    }
-
-    function handleGoogleLogin(response) {
-      const responsePayload = parseJwt(response.credential);
-      const code = generateCode();
-
-      currentUser = { 
-        name: responsePayload.name, 
-        code: code,
-        email: responsePayload.email 
-      };
-
-      saveToLocalStorage();
-      enterDashboard();
-    }
-
-    function parseJwt(token) {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => 
-        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join(''));
-
-      return JSON.parse(jsonPayload);
-    }
-
-    function toggleAuth(mode) {
-      if (mode === 'register') {
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('register-form').classList.remove('hidden');
-      } else {
-        document.getElementById('register-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-      }
-    }
-
-    function handleLogin(e) {
-      e.preventDefault();
-      const id = document.getElementById('login-id').value.trim() || 'User';
-      const code = id.startsWith('BC') ? id.toUpperCase() : generateCode();
-      const name = id.startsWith('BC') ? 'User' : id;
-
-      currentUser = { name: name, code: code };
-      saveToLocalStorage();
-      enterDashboard();
-    }
-
-    function handleRegister(e) {
-      e.preventDefault();
-      const name = document.getElementById('reg-name').value.trim();
-      const code = generateCode();
-
-      currentUser = { name: name, code: code };
-      saveToLocalStorage();
-
-      document.getElementById('register-form').classList.add('hidden');
-      document.getElementById('code-card').classList.remove('hidden');
-      document.getElementById('generated-code').innerText = currentUser.code;
-    }
-
-    function enterDashboard() {
+    function showApp() {
       document.getElementById('auth-container').classList.add('hidden');
-      
-      const splash = document.getElementById('splash-screen');
-      if (splash) {
-        splash.style.opacity = '0';
-        splash.classList.add('hidden');
-      }
-
       document.getElementById('app-container').classList.remove('hidden');
-      
       document.getElementById('my-name').innerText = currentUser.name;
       document.getElementById('my-code').innerText = currentUser.code;
-      document.getElementById('my-avatar').innerText = currentUser.name.charAt(0).toUpperCase();
-
-      document.getElementById('add-my-code').value = currentUser.code;
-
+      document.getElementById('my-avatar').innerText = currentUser.name[0].toUpperCase();
       renderContacts();
     }
 
-    function logout() {
-      localStorage.removeItem('baatcheet_user');
-      location.reload();
-    }
+    function openAddModal() { document.getElementById('add-modal').classList.remove('hidden'); }
+    function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
 
-    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function confirmAddContact() {
+      const code = document.getElementById('friend-code').value.trim().toUpperCase();
+      const name = document.getElementById('friend-name').value.trim();
+      if (!code || !name) return alert('Fill all fields');
 
-    function getRoomId(codeA, codeB) {
-      return [codeA, codeB].sort().join('_');
-    }
-
-    function saveContact() {
-      const friendCode = document.getElementById('add-friend-code').value.trim().toUpperCase();
-      const friendName = document.getElementById('add-name-input').value.trim();
-
-      if (!friendCode || !friendName) {
-        alert("Please enter both friend's name and code.");
-        return;
-      }
-
-      if (friendCode === currentUser.code) {
-        alert("You cannot add your own user code!");
-        return;
-      }
-
-      const roomId = getRoomId(currentUser.code, friendCode);
-      chatList.push({ id: roomId, type: 'contact', name: friendName, code: friendCode });
-      saveToLocalStorage();
-      closeModal('modal-add-contact');
-      document.getElementById('add-friend-code').value = '';
-      document.getElementById('add-name-input').value = '';
+      const roomId = [currentUser.code, code].sort().join('_');
+      const newContact = { id: roomId, code, name };
+      contacts.push(newContact);
+      localStorage.setItem(`bc_contacts_${currentUser.code}`, JSON.stringify(contacts));
+      
+      closeAddModal();
       renderContacts();
-    }
-
-    function saveGroup() {
-      const groupName = document.getElementById('group-name-input').value.trim();
-      const groupCodes = document.getElementById('group-codes-input').value.trim();
-
-      if (!groupName) {
-        alert("Please enter a group name.");
-        return;
-      }
-
-      const members = groupCodes ? groupCodes.split(',').map(s => s.trim().toUpperCase()) : [];
-      members.push(currentUser.code);
-
-      const groupId = 'GRP_' + Date.now();
-      chatList.push({ id: groupId, type: 'group', name: groupName, code: members.length + " Members", members: members });
-      saveToLocalStorage();
-      closeModal('modal-add-group');
-      document.getElementById('group-name-input').value = '';
-      document.getElementById('group-codes-input').value = '';
-      renderContacts();
+      selectContact(newContact);
     }
 
     function renderContacts() {
       const list = document.getElementById('contacts-list');
       list.innerHTML = '';
-
-      if (chatList.length === 0) {
-        list.innerHTML = `
-          <div style="padding:24px; text-align:center; color:#9ca3af; font-size:12px;">
-            No contacts or groups added yet.<br>Click the icons above to start.
-          </div>`;
-        return;
-      }
-
-      chatList.forEach(c => {
+      contacts.forEach(c => {
         const item = document.createElement('div');
         item.className = 'contact-item';
-        if (activeChat && activeChat.id === c.id) item.classList.add('active');
-
-        item.onclick = () => selectChat(c, item);
-        
-        const isGroup = c.type === 'group';
-        const avatarBg = isGroup ? '#2563eb' : '#16a34a';
-
-        item.innerHTML = `
-          <div class="avatar" style="background-color:${avatarBg}; font-size:14px;">${c.name.charAt(0).toUpperCase()}</div>
-          <div style="flex:1; overflow:hidden;">
-            <div style="display:flex; justify-content:space-between; align-items:baseline;">
-              <span style="font-weight:600; font-size:13px; color:#111827;">${c.name}</span>
-            </div>
-            <span style="font-size:10px; color:${isGroup ? '#2563eb' : '#16a34a'}; font-family:monospace; font-weight:bold;">${c.code}</span>
-          </div>
-        `;
+        item.innerHTML = `<div class="avatar">${c.name[0].toUpperCase()}</div><div><b>${c.name}</b><br><small>${c.code}</small></div>`;
+        item.onclick = () => selectContact(c);
         list.appendChild(item);
       });
     }
 
-    function selectChat(chat, element) {
-      activeChat = chat;
-      document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
-      if (element) element.classList.add('active');
-
-      document.getElementById('empty-state').classList.add('hidden');
-      document.getElementById('active-chat').classList.remove('hidden');
-      
-      document.getElementById('active-name').innerText = chat.name;
-      document.getElementById('active-avatar').innerText = chat.name.charAt(0).toUpperCase();
-      document.getElementById('active-avatar').style.backgroundColor = chat.type === 'group' ? '#2563eb' : '#4b5563';
-      document.getElementById('active-status').innerText = chat.type === 'group' ? chat.code : 'Online';
-      
-      subscribeToMessages();
+    function selectContact(c) {
+      activeChat = c;
+      document.getElementById('chat-title').innerText = c.name + " (" + c.code + ")";
       document.getElementById('app-container').classList.add('chat-open');
-    }
-
-    function subscribeToMessages() {
-      const container = document.getElementById('messages-container');
-      container.innerHTML = '';
-
-      if (currentListenerRef) {
-        currentListenerRef.off();
-      }
-
-      if (!activeChat) return;
-
-      currentListenerRef = db.ref('chats/' + activeChat.id + '/messages');
-      currentListenerRef.on('child_added', (snapshot) => {
-        const m = snapshot.val();
-        const isMe = m.senderCode === currentUser.code;
-        appendMessageUI(m.text, m.time, isMe, m.senderName);
+      
+      // Sync messages live
+      db.ref('chats/' + activeChat.id).on('value', snapshot => {
+        const container = document.getElementById('messages-container');
+        container.innerHTML = '';
+        const data = snapshot.val();
+        if (data) {
+          Object.values(data).forEach(m => {
+            const isMe = m.sender === currentUser.code;
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isMe ? 'msg-out' : 'msg-in'}`;
+            bubble.innerText = m.text;
+            container.appendChild(bubble);
+          });
+          container.scrollTop = container.scrollHeight;
+        }
       });
-    }
-
-    function appendMessageUI(text, time, isMe, senderName) {
-      const container = document.getElementById('messages-container');
-      const msgBubble = document.createElement('div');
-      msgBubble.className = `message-bubble ${isMe ? 'msg-out' : 'msg-in'}`;
-
-      let senderHtml = (!isMe && senderName) ? `<div class="msg-sender">${escapeHtml(senderName)}</div>` : '';
-      let ticks = isMe ? ' ✓✓' : '';
-
-      msgBubble.innerHTML = `${senderHtml}<div>${escapeHtml(text)}</div><div class="msg-time">${time}${ticks}</div>`;
-      container.appendChild(msgBubble);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    function closeMobileChat() {
-      document.getElementById('app-container').classList.remove('chat-open');
     }
 
     function sendMessage(e) {
       e.preventDefault();
       const input = document.getElementById('msg-input');
       const text = input.value.trim();
-      if (!text || !activeChat) return;
+      if (!text) return;
+      if (!activeChat) return alert('Please add/select a contact first!');
 
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      db.ref('chats/' + activeChat.id + '/messages').push({
-        senderCode: currentUser.code,
-        senderName: currentUser.name,
+      db.ref('chats/' + activeChat.id).push({
+        sender: currentUser.code,
         text: text,
-        time: timeStr,
-        timestamp: Date.now()
+        time: Date.now()
       });
 
       input.value = '';
     }
 
-    function filterContacts() {
-      const q = document.getElementById('chat-search').value.toLowerCase();
-      document.querySelectorAll('.contact-item').forEach(item => {
-        item.style.display = item.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
-      });
-    }
-
-    function escapeHtml(text) {
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    function closeMobileChat() {
+      document.getElementById('app-container').classList.remove('chat-open');
     }
   </script>
 </body>
